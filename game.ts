@@ -2,7 +2,8 @@ enum Color {
   Black = "black",
   Red = "red",
   Green = "green",
-  Blue = "blue"
+  Blue = "blue",
+  Yellow = "yellow"
 }
 
 interface Paddle {
@@ -22,6 +23,17 @@ interface Ball {
   color: Color;
 }
 
+interface Brick {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: Color;
+  alive: boolean;
+}
+
+let mouseX: number = 0;
+let mouseY: number = 0;
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 const paddle: Paddle = {
@@ -41,6 +53,25 @@ const ball: Ball = {
   color: Color.Blue
 };
 
+const bricks: Brick[] = [];
+
+for (let row = 0; row < 2; row++) {
+  for (let col = 0; col < 10; col++) {
+    const brickWidth = 60;
+    const brickHeight = 20;
+    const padding = 20;
+
+    bricks.push({
+      x: col * (brickWidth + padding) + padding / 2,
+      y: row * (brickHeight + padding) + padding,
+      color: Color.Red,
+      width: brickWidth,
+      height: brickHeight,
+      alive: true
+    });
+  }
+}
+
 function drawRect(
   x: number,
   y: number,
@@ -59,6 +90,20 @@ function drawCircle(x: number, y: number, radius: number, color: Color) {
   ctx.fill();
 }
 
+function drawText(x: number, y: number, text: string, color: Color) {
+  ctx.fillStyle = color;
+  ctx.font = "12px Verdana";
+  ctx.fillText(text, x, y);
+}
+
+function drawBricks() {
+  bricks
+    .filter(brick => brick.alive)
+    .forEach(brick => {
+      drawRect(brick.x, brick.y, brick.width, brick.height, brick.color);
+    });
+}
+
 function drawAll() {
   // background
   drawRect(0, 0, canvas.width, canvas.height, Color.Black);
@@ -68,6 +113,10 @@ function drawAll() {
 
   // ball
   drawCircle(ball.x, ball.y, ball.radius, ball.color);
+
+  drawBricks();
+
+  drawText(mouseX, mouseY, `${mouseX}, ${mouseY}`, Color.Yellow);
 }
 
 function resetBall() {
@@ -97,7 +146,7 @@ function moveAll() {
   // hit paddle
   if (
     ball.y > paddle.y - ball.radius &&
-    ball.y < paddle.y + paddle.height &&
+    ball.y < paddle.y &&
     ball.x > paddle.x - ball.radius &&
     ball.x < paddle.x + paddle.width
   ) {
@@ -107,6 +156,19 @@ function moveAll() {
     ball.vy = -ball.vy;
     ball.vx = distanceFromPaddleCenter * 0.35;
   }
+
+  bricks
+    .filter(brick => brick.alive)
+    .forEach(brick => {
+      if (
+        ball.y - ball.radius < brick.y + brick.height &&
+        ball.x > brick.x &&
+        ball.x < brick.x + brick.width
+      ) {
+        brick.alive = false;
+        ball.vy = -ball.vy;
+      }
+    });
 }
 
 function render() {
@@ -118,7 +180,8 @@ function render() {
 function movePaddle(event: MouseEvent) {
   const rect = canvas.getBoundingClientRect();
   const root = document.documentElement;
-  const mouseX = event.clientX - rect.left - root.scrollLeft;
+  mouseX = event.clientX - rect.left - root.scrollLeft;
+  mouseY = event.clientY - rect.top - root.scrollTop;
   const relativePosition = mouseX - paddle.width / 2;
 
   paddle.x = Math.min(
