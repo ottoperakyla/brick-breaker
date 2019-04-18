@@ -1,3 +1,9 @@
+enum GameState {
+  Running = "running",
+  Win = "win",
+  Lose = "lose"
+}
+
 enum Color {
   Black = "black",
   Red = "red",
@@ -52,7 +58,7 @@ const ball: Ball = {
   radius: 10,
   color: Color.Blue
 };
-
+let gameState: GameState = GameState.Running;
 const bricks: Brick[] = [];
 
 for (let row = 0; row < 2; row++) {
@@ -90,9 +96,15 @@ function drawCircle(x: number, y: number, radius: number, color: Color) {
   ctx.fill();
 }
 
-function drawText(x: number, y: number, text: string, color: Color) {
+function drawText(
+  x: number,
+  y: number,
+  text: string,
+  color: Color,
+  fontSize: number
+) {
   ctx.fillStyle = color;
-  ctx.font = "12px Verdana";
+  ctx.font = `${fontSize}px Verdana`;
   ctx.fillText(text, x, y);
 }
 
@@ -116,7 +128,7 @@ function drawAll() {
 
   drawBricks();
 
-  drawText(mouseX, mouseY, `${mouseX}, ${mouseY}`, Color.Yellow);
+  drawText(mouseX, mouseY, `${mouseX}, ${mouseY}`, Color.Yellow, 12);
 }
 
 function resetBall() {
@@ -131,6 +143,7 @@ function moveAll() {
   // bottom, game over
   if (ball.y > canvas.height - ball.radius) {
     resetBall();
+    gameState = GameState.Lose;
   }
 
   // hit wall
@@ -157,24 +170,50 @@ function moveAll() {
     ball.vx = distanceFromPaddleCenter * 0.35;
   }
 
-  bricks
-    .filter(brick => brick.alive)
-    .forEach(brick => {
-      if (
-        ball.y - ball.radius < brick.y + brick.height &&
-        ball.x > brick.x &&
-        ball.x < brick.x + brick.width
-      ) {
-        brick.alive = false;
-        ball.vy = -ball.vy;
-      }
-    });
+  const aliveBricks = bricks.filter(brick => brick.alive);
+
+  aliveBricks.forEach(brick => {
+    if (
+      ball.y - ball.radius < brick.y + brick.height &&
+      ball.x > brick.x &&
+      ball.x < brick.x + brick.width
+    ) {
+      brick.alive = false;
+      ball.vy = -ball.vy;
+    }
+  });
+
+  if (aliveBricks.length === 0) {
+    gameState = GameState.Win;
+  }
+}
+
+function renderWin() {
+  drawRect(0, 0, canvas.width, canvas.height, Color.Black);
+  ctx.textAlign = "center";
+  drawText(canvas.width / 2, canvas.height / 2, "You Win!!!", Color.Yellow, 40);
+}
+
+function renderLose() {
+  drawRect(0, 0, canvas.width, canvas.height, Color.Black);
+  ctx.textAlign = "center";
+  drawText(canvas.width / 2, canvas.height / 2, "You Lose!!!", Color.Red, 40);
 }
 
 function render() {
-  moveAll();
-  drawAll();
-  requestAnimationFrame(render);
+  switch (gameState) {
+    case GameState.Running:
+      moveAll();
+      drawAll();
+      requestAnimationFrame(render);
+      break;
+    case GameState.Win:
+      renderWin();
+      break;
+    case GameState.Lose:
+      renderLose();
+      break;
+  }
 }
 
 function movePaddle(event: MouseEvent) {
