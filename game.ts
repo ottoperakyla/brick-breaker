@@ -10,7 +10,8 @@ enum Color {
   Red = "red",
   Green = "green",
   Blue = "blue",
-  Yellow = "yellow"
+  Yellow = "yellow",
+  White = "white"
 }
 
 interface Paddle {
@@ -41,6 +42,10 @@ const paddle: Paddle = {
   height: 10,
   color: Color.Green
 };
+const fullscreenButton = document.querySelector("#fullscreen");
+fullscreenButton.addEventListener("click", e => {
+  canvas.requestFullscreen();
+});
 
 const ball: Ball = {
   x: 75,
@@ -126,7 +131,7 @@ function drawBricks() {
 
 function drawAll() {
   // background
-  drawRect(0, 0, canvas.width, canvas.height, Color.Black);
+  drawRect(0, 0, canvas.width, canvas.height, Color.White);
 
   // paddle
   drawRect(paddle.x, paddle.y, paddle.width, paddle.height, paddle.color);
@@ -152,31 +157,37 @@ function moveBall() {
   }
 
   // hit wall
-  if (ball.x > canvas.width - ball.radius || ball.x < ball.radius) {
+  if (
+    (ball.x > canvas.width - ball.radius && ball.vx > 0) ||
+    (ball.x < ball.radius && ball.vx < 0)
+  ) {
     ball.vx = -ball.vx;
   }
 
   // ceiling
-  if (ball.y < ball.radius) {
+  if (ball.y < ball.radius && ball.vy < 0) {
     ball.vy = -ball.vy;
   }
 }
 
-function rowColToIndex(row: number, col: number) {
+function colRowToIndex(col: number, row: number) {
   return col + row * bricksPerRow;
+}
+
+function isBrickAtColRow(col: number, row: number) {
+  if (col >= 0 && col < bricksPerRow && row >= 0 && row < brickRows) {
+    const brickIndex = colRowToIndex(col, row);
+    return bricks[brickIndex];
+  } else {
+    return false;
+  }
 }
 
 function ballBrickHandling() {
   const ballBrickCol = Math.floor(ball.x / brickWidth);
   const ballBrickRow = Math.floor(ball.y / brickHeight);
-  const index = rowColToIndex(ballBrickRow, ballBrickCol);
-  if (
-    ballBrickCol >= 0 &&
-    ballBrickCol < bricksPerRow &&
-    ballBrickRow >= 0 &&
-    ballBrickRow < brickRows &&
-    bricks[index]
-  ) {
+  const index = colRowToIndex(ballBrickCol, ballBrickRow);
+  if (isBrickAtColRow(ballBrickCol, ballBrickRow)) {
     bricks[index] = false;
     bricksLeft--;
 
@@ -191,8 +202,7 @@ function ballBrickHandling() {
 
     // colum changed, so its a horizontal collision
     if (columnChanged) {
-      const adjBrickSide = rowColToIndex(ballBrickRow, ballBrickColPrev);
-      if (!bricks[adjBrickSide]) {
+      if (!isBrickAtColRow(ballBrickColPrev, ballBrickRow)) {
         // adjacent brick is missing
         ball.vx *= -1;
       }
@@ -200,8 +210,7 @@ function ballBrickHandling() {
 
     // row changed, so its a vertical collision
     if (rowChanged) {
-      const adjBrickSide = rowColToIndex(ballBrickRowPrev, ballBrickCol);
-      if (!bricks[adjBrickSide]) {
+      if (!isBrickAtColRow(ballBrickCol, ballBrickRowPrev)) {
         // adjacent brick is missing
         ball.vy *= -1;
       }

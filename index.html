@@ -6,13 +6,19 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Brick Breaker</title>
     <style>
-      * {
-        cursor: none;
+      @media all and (display-mode: fullscreen) {
+        * {
+          cursor: none;
+        }
+      }
+      canvas {
+        border: 2px solid black;
       }
     </style>
   </head>
   <body>
     <canvas width="800" height="600"></canvas>
+    <button id="fullscreen">Fullscreen</button>
     <script src="game.ts"></script>
   </body>
 </html>
