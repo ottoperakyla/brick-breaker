@@ -1,4 +1,5 @@
 enum GameState {
+  Init = "init",
   Running = "running",
   Win = "win",
   Lose = "lose"
@@ -29,15 +30,6 @@ interface Ball {
   color: Color;
 }
 
-interface Brick {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: Color;
-  alive: boolean;
-}
-
 let mouseX: number = 0;
 let mouseY: number = 0;
 const canvas = document.querySelector("canvas");
@@ -51,31 +43,40 @@ const paddle: Paddle = {
 };
 
 const ball: Ball = {
-  x: canvas.width / 2,
-  y: canvas.height / 2,
-  vx: 3,
-  vy: 5,
+  x: 75,
+  y: 75,
+  vx: 5,
+  vy: 7,
   radius: 10,
   color: Color.Blue
 };
-let gameState: GameState = GameState.Running;
-const bricks: Brick[] = [];
 
-for (let row = 0; row < 2; row++) {
-  for (let col = 0; col < 10; col++) {
-    const brickWidth = 60;
-    const brickHeight = 20;
-    const padding = 20;
+let gameState: GameState = GameState.Init;
+let bricks: boolean[] = [];
+const brickWidth = 80;
+const brickHeight = 20;
+const brickRows = 14;
+const bricksPerRow = canvas.width / brickWidth;
+const bricksAmount = brickRows * bricksPerRow;
+let bricksLeft = 0;
+const bricksStartIndex = 3 * bricksPerRow;
 
-    bricks.push({
-      x: col * (brickWidth + padding) + padding / 2,
-      y: row * (brickHeight + padding) + padding,
-      color: Color.Red,
-      width: brickWidth,
-      height: brickHeight,
-      alive: true
-    });
+function resetBricks() {
+  let i = 0;
+  for (; i < bricksStartIndex; i++) {
+    bricks[i] = false;
   }
+  for (; i < bricksAmount; i++) {
+    bricksLeft++;
+    bricks[i] = true;
+  }
+}
+
+function init() {
+  resetBall();
+  resetBricks();
+  gameState = GameState.Running;
+  render();
 }
 
 function drawRect(
@@ -109,11 +110,18 @@ function drawText(
 }
 
 function drawBricks() {
-  bricks
-    .filter(brick => brick.alive)
-    .forEach(brick => {
-      drawRect(brick.x, brick.y, brick.width, brick.height, brick.color);
-    });
+  bricks.forEach((alive, i) => {
+    if (alive) {
+      const row = Math.floor(i / bricksPerRow);
+      const col = i % bricksPerRow;
+      const x = col * brickWidth + 1;
+      const y = row * brickHeight + 1;
+      const width = brickWidth - 2;
+      const height = brickHeight - 2;
+
+      drawRect(x, y, width, height, Color.Red);
+    }
+  });
 }
 
 function drawAll() {
@@ -125,10 +133,7 @@ function drawAll() {
 
   // ball
   drawCircle(ball.x, ball.y, ball.radius, ball.color);
-
   drawBricks();
-
-  drawText(mouseX, mouseY, `${mouseX}, ${mouseY}`, Color.Yellow, 12);
 }
 
 function resetBall() {
@@ -136,14 +141,14 @@ function resetBall() {
   ball.y = canvas.height / 2 - ball.radius;
 }
 
-function moveAll() {
+function moveBall() {
   ball.x += ball.vx;
   ball.y += ball.vy;
 
   // bottom, game over
   if (ball.y > canvas.height - ball.radius) {
     resetBall();
-    gameState = GameState.Lose;
+    resetBricks();
   }
 
   // hit wall
@@ -155,8 +160,61 @@ function moveAll() {
   if (ball.y < ball.radius) {
     ball.vy = -ball.vy;
   }
+}
 
-  // hit paddle
+function rowColToIndex(row: number, col: number) {
+  return col + row * bricksPerRow;
+}
+
+function ballBrickHandling() {
+  const ballBrickCol = Math.floor(ball.x / brickWidth);
+  const ballBrickRow = Math.floor(ball.y / brickHeight);
+  const index = rowColToIndex(ballBrickRow, ballBrickCol);
+  if (
+    ballBrickCol >= 0 &&
+    ballBrickCol < bricksPerRow &&
+    ballBrickRow >= 0 &&
+    ballBrickRow < brickRows &&
+    bricks[index]
+  ) {
+    bricks[index] = false;
+    bricksLeft--;
+
+    const prevBallX = ball.x - ball.vx;
+    const prevBallY = ball.y - ball.vy;
+    const ballBrickColPrev = Math.floor(prevBallX / brickWidth);
+    const ballBrickRowPrev = Math.floor(prevBallY / brickHeight);
+
+    const columnChanged = ballBrickColPrev !== ballBrickCol;
+    const rowChanged = ballBrickRowPrev !== ballBrickRow;
+    const armpitCase = !(columnChanged || rowChanged);
+
+    // colum changed, so its a horizontal collision
+    if (columnChanged) {
+      const adjBrickSide = rowColToIndex(ballBrickRow, ballBrickColPrev);
+      if (!bricks[adjBrickSide]) {
+        // adjacent brick is missing
+        ball.vx *= -1;
+      }
+    }
+
+    // row changed, so its a vertical collision
+    if (rowChanged) {
+      const adjBrickSide = rowColToIndex(ballBrickRowPrev, ballBrickCol);
+      if (!bricks[adjBrickSide]) {
+        // adjacent brick is missing
+        ball.vy *= -1;
+      }
+    }
+
+    if (armpitCase) {
+      ball.vy *= -1;
+      ball.vx *= -1;
+    }
+  }
+}
+
+function ballPaddleHandling() {
   if (
     ball.y > paddle.y - ball.radius &&
     ball.y < paddle.y &&
@@ -166,26 +224,19 @@ function moveAll() {
     const paddleCenter = paddle.x + paddle.width / 2;
     const distanceFromPaddleCenter = paddleCenter - ball.x;
 
-    ball.vy = -ball.vy;
-    ball.vx = distanceFromPaddleCenter * 0.35;
-  }
+    ball.vy *= -1;
+    ball.vx = distanceFromPaddleCenter * 0.25;
 
-  const aliveBricks = bricks.filter(brick => brick.alive);
-
-  aliveBricks.forEach(brick => {
-    if (
-      ball.y - ball.radius < brick.y + brick.height &&
-      ball.x > brick.x &&
-      ball.x < brick.x + brick.width
-    ) {
-      brick.alive = false;
-      ball.vy = -ball.vy;
+    if (bricksLeft === 0) {
+      resetBricks();
     }
-  });
-
-  if (aliveBricks.length === 0) {
-    gameState = GameState.Win;
   }
+}
+
+function moveAll() {
+  moveBall();
+  ballBrickHandling();
+  ballPaddleHandling();
 }
 
 function renderWin() {
@@ -202,6 +253,9 @@ function renderLose() {
 
 function render() {
   switch (gameState) {
+    case GameState.Init:
+      init();
+      break;
     case GameState.Running:
       moveAll();
       drawAll();
